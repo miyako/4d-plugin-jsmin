@@ -57,6 +57,7 @@ namespace jsmin
 	get(CUTF16String &src, size_t *pos)
 	{
 		size_t p = *pos;
+		
 		PA_Unichar c = src.at(p);
 		p++;
 		*pos = p;
@@ -109,7 +110,7 @@ namespace jsmin
 		return c;
 	}
 	
-	PA_Unichar
+	void
 	action(int d, CUTF16String &src, CUTF16String &dst,
 				 size_t *pos,
 				 PA_Unichar *theA, PA_Unichar *theB,
@@ -184,7 +185,6 @@ namespace jsmin
 					*theB = jsmin::next(src, pos);
 				}
 		}
-		return *theA;
 	}
 	
 	void jsmin(CUTF16String &src, CUTF16String &dst)
@@ -194,6 +194,9 @@ namespace jsmin
 		PA_Unichar theA, theB;
 		PA_Unichar theX, theY;
 		
+		src += ';';
+		src += ';';
+		
 		theA = 0x000A;
 		theB = 0x0000;
 		theX = 0x0000;
@@ -202,7 +205,6 @@ namespace jsmin
 		jsmin::action(3, src, dst, &pos, &theA, &theB, &theX, &theY);
 		
 		while (pos < src.size()) {
-			//		PA_YieldAbsolute();
 			switch (theA) {
 				case ' ':
 					jsmin::action(jsmin::isAlphanum(theB) ? 1 : 2, src, dst, &pos, &theA, &theB, &theX, &theY);
