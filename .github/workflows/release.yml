@@ -71,6 +71,9 @@ jobs:
           Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "$base/plugins"
           Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "$base/Plugins/Default"
           Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "Objs"
+          # MSBuild OutDir (see .vcxproj). Remove any stale binaries so only
+          # the fresh x64 build output can be picked up.
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "$product.4dbase/Plugins/$product.bundle"
 
       - name: build x64
         shell: cmd
@@ -85,13 +88,16 @@ jobs:
           $canonicalDir = "$base/Plugins/$product.bundle/Contents/Windows64"
           New-Item -ItemType Directory -Force -Path $canonicalDir | Out-Null
 
-          $found = Get-ChildItem -Recurse -Filter "$product.4DX" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -like "*Plugins*" } | Select-Object -First 1
+          # Take the binary ONLY from the Release|x64 MSBuild OutDir declared in
+          # the .vcxproj; a recursive search can pick up stale x86 copies.
+          $msbuildOut = "$product.4dbase/Plugins/$product.bundle/Contents/Windows64/$product.4DX"
+          $found = Get-Item -LiteralPath $msbuildOut -ErrorAction SilentlyContinue
           if (-not $found) {
             Get-ChildItem -Recurse -Filter "*.4DX" | ForEach-Object { Write-Host $_.FullName }
-            Write-Error "Windows binary $product.4DX not found after build"
+            Write-Error "Windows binary not found at MSBuild output $msbuildOut"
             exit 1
           }
-          Write-Host "Found at: $($found.FullName)"
+          Write-Host "Found at: $($found.FullName) (LastWriteTime $($found.LastWriteTime))"
 
           $destination = Join-Path $canonicalDir "$product.4DX"
           $sourceResolved = (Resolve-Path $found.FullName).Path
@@ -107,6 +113,27 @@ jobs:
             Copy-Item $found.FullName $destination -Force
           }
           Get-ChildItem $canonicalDir
+
+      - name: verify windows binary is x64
+        shell: pwsh
+        run: |
+          $path = "${{ env.BASE_DIR }}/Plugins/${{ env.PRODUCT_NAME }}.bundle/Contents/Windows64/${{ env.PRODUCT_NAME }}.4DX"
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $path).Path)
+          if ($bytes.Length -lt 0x40 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) {
+            Write-Error "$path is not a PE file"
+            exit 1
+          }
+          $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+          if ([BitConverter]::ToUInt32($bytes, $peOffset) -ne 0x00004550) {
+            Write-Error "$path has no PE signature"
+            exit 1
+          }
+          $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+          Write-Host ("PE machine: 0x{0:X4}" -f $machine)
+          if ($machine -ne 0x8664) {
+            Write-Error ("$path is not x64 (machine 0x{0:X4}, expected 0x8664)" -f $machine)
+            exit 1
+          }
 
       - name: upload windows binaries
         uses: actions/upload-artifact@v4
