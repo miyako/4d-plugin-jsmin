@@ -1,6 +1,97 @@
 # 4d-plugin-jsmin
 4D port of [JSMin](https://github.com/douglascrockford/JSMin) by Douglas Crockford 
 
+## Manual versioning and publication
+
+The verified default branch is `master`, but both workflows operate on the ref
+explicitly selected in Actions; neither assumes that only the default branch can
+be released. **Bump version** accepts `patch`, `minor` or `major`. It checks out
+the immutable selected `github.sha`, requires a clean checkout and validates
+source metadata before committing only `JSMin.xcodeproj/project.pbxproj`,
+`Info.plist` and `English.lproj/InfoPlist.strings` to the selected branch.
+
+The selected remote branch must still equal the dispatched SHA before and after
+preparing the commit. The required executable `.github/scripts/bump-hooks/pre-push`
+also compares receive-pack's advertised old SHA with that exact selected SHA,
+rejecting late advancement, ancestor rewind, deletion and same-result races
+after the final `ls-remote`. A missing/nonexecutable guard fails closed. Push is
+nonforce, targets only the explicit branch and disables tag following with both
+`push.followTags=false` and `--no-follow-tags`. Bump creates no tag and does not
+start Build. If it rejects branch movement, select the branch again and dispatch
+a new bump; do not reuse the stale selection.
+
+**Build** is a separate `workflow_dispatch`-only workflow with **zero inputs**
+beyond Actions' ref selector. Every checkout uses `github.sha`. It validates
+strict source `X.Y.Z` and derives `vX.Y.Z`, `JSMin-X.Y.Z.zip` and
+`JSMin-X.Y.Z.dmg`; there is no typed tag or tag-push trigger. Windows x64
+MSBuild/v143, its exact output path and PE x64 check, macOS universal
+arm64/x86_64 validation, Windows artifact merge, Developer ID signing/strict
+verification, both ZIP/DMG notarizations and DMG stapling remain required gates.
+Existing SDK/API/framework dependencies, secret names and packaging stay intact.
+
+Build uses one constant repository-wide publication concurrency group across
+branches. Before native work, and again immediately after all gates and before
+publication, it checks remote tags and authenticated, explicitly paginated
+release lists **including drafts**. Every page and entry is schema-validated.
+API 404, authentication, network, malformed-response and later-page failures
+stop publication; only a complete successful no-match permits creation.
+Source version files must still match the selected commit at both checks.
+
+Publication is create-only: POST `git/refs` creates the tag at the exact selected
+SHA (even a concurrent same-SHA creation is an error), followed by remote SHA
+verification. A separate POST `releases` explicitly sets `tag_name`,
+`target_commitish`, `name`, `draft=false`, `prerelease=false` and the original
+empty notes policy (no generated notes). Separate asset POSTs upload only to the
+returned new release ID. There is no update, overwrite, clobber, deletion,
+rollback or retry, and no create-with-assets temporary draft.
+
+**Partial-state recovery:** failures retain any accepted tag, public release and
+uploaded assets, including ambiguous network responses. Inspect the Actions
+error, remote tag SHA, draft/public release list and assets before deciding what
+to do. A rerun intentionally refuses an existing version rather than repairing
+it. An authorized maintainer must explicitly decide how to recover retained
+state outside this workflow, or use a new source version after inspection.
+Never assume a failed upload removed the tag or release.
+
+### Source metadata contract and migration evidence
+
+The old bump header (introduced in `f87453e`) explicitly chose
+`MARKETING_VERSION` when present, falling back to `CURRENT_PROJECT_VERSION` only
+for older-style projects predating that split; it did **not** promise to bump
+both. `d9faf6a` introduced six marketing/current-project settings at 2.0.0.
+Subsequent bumps through `b8a2984` changed only marketing to **2.0.3**.
+All six `CURRENT_PROJECT_VERSION=2.0.0` settings are therefore retained build
+metadata, not normalized to marketing or claimed to be an independently
+incrementing mechanism.
+
+The target's three `INFOPLIST_FILE = Info.plist` settings use the root plist.
+Its short version was still 2.0.0. The source English `InfoPlist.strings` is
+explicitly copied by the Resources build phase and its 1.0 short/info strings
+override displayed bundle metadata. Those display surfaces are repaired to the
+existing marketing authority **2.0.3**, without a release increment. The source
+UTF-8 BOM is retained and legacy CR-only localized lines are normalized to LF.
+`CFBundleVersion` remains absent. Supported Xcode references are resolved and
+preserved; an optional valid bundle build version is validated separately and
+never rewritten. Current-project build settings, localization revision counters,
+prebuilt bundles, native dependencies, manifest/4D/schema metadata are untouched.
+
+Helpers and regressions adapt reviewed prior art from
+[miyako/4d-plugin-structure-access#1](https://github.com/miyako/4d-plugin-structure-access/pull/1)
+(`af1b65e6da2c61636a946a4b6ca2b4d9245da569`),
+[miyako/4d-plugin-kotoeri-option#1](https://github.com/miyako/4d-plugin-kotoeri-option/pull/1)
+(`4b6eca34d855aa1d8f66c8ef6e62b96e8748ebd0`) and
+[miyako/4d-plugin-script#1](https://github.com/miyako/4d-plugin-script/pull/1)
+(`4cdf7b5d4ec645385654e6cb17a2ff0603925fb5`), retaining JSMin's actual
+marketing-first contract, paths, native jobs and asset shapes.
+
+Focused local checks (no native/signing execution):
+
+```sh
+python3 -m unittest discover -s .github/tests -v
+actionlint .github/workflows/*.yml
+sh -n .github/scripts/bump-hooks/pre-push
+```
+
 `JSMin` is a single-command 4D plugin that minifies JavaScript source text: it strips comments and collapses insignificant whitespace while preserving the token boundaries needed to keep the code semantically identical. It's a pure text-in/text-out plugin — it doesn't parse or execute JavaScript, doesn't touch the file system, and doesn't call any OS-level API, so there are no platform-specific behaviors to account for.
 
 | Command | Returns | Purpose |

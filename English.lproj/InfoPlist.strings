@@ -1,1 +1,5 @@
-﻿/* Localized versions of Info.plist keys */CFBundleName = "JSMin";CFBundleShortVersionString = "1.0";CFBundleGetInfoString = "JSMin version 1.0, Copyright 2016 miyako.";
+﻿/* Localized versions of Info.plist keys */
+
+CFBundleName = "JSMin";
+CFBundleShortVersionString = "2.0.3";
+CFBundleGetInfoString = "JSMin version 2.0.3, Copyright 2016 miyako.";
