@@ -1,6 +1,15 @@
 # 4d-plugin-jsmin
 4D port of [JSMin](https://github.com/douglascrockford/JSMin) by Douglas Crockford 
 
+## Native helper ownership
+
+The compiled picture wrappers release transferred path strings once, avoid
+overwriting allocated empty owners, balance retained picture references, and
+interpret charset converter results as bytes rather than UTF-16 code units.
+The exported JSMin text command and minifier algorithm are unchanged.
+See [the bounded ownership audit and unsigned regressions](tests/ownership/README.md)
+for exact SDK provenance, inventory, deferred boundaries and platform limits.
+
 ## Manual versioning and publication
 
 The verified default branch is `master`, but both workflows operate on the ref
