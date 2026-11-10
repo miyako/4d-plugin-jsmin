@@ -1,0 +1,31 @@
+name: Native ownership
+
+on:
+  pull_request:
+    paths:
+      - '4DPlugin.cpp'
+      - '4DPlugin.h'
+      - '4D Plugin API/**'
+      - 'tests/ownership/**'
+      - '.github/workflows/ownership.yml'
+  push:
+    branches: [master]
+    paths:
+      - '4DPlugin.cpp'
+      - '4DPlugin.h'
+      - '4D Plugin API/**'
+      - 'tests/ownership/**'
+      - '.github/workflows/ownership.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ownership:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Full-source ASan and UBSan differential regression
+        run: python3 tests/ownership/run.py --baseline --output "$RUNNER_TEMP/ownership"
